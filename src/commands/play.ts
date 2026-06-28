@@ -85,13 +85,14 @@ const command: CommandModule = {
 
       await mpv.playlistClear(client)
 
-      for (const item of items) {
-        await mpv.append(client, item.url)
-      }
-
       const idx = items.findIndex(i => i.url === selected.url)
-      if (idx >= 0) {
-        await mpv.playlistPlayIndex(client, idx)
+
+      await mpv.play(client, selected.url)
+
+      for (let i = 0; i < items.length; i++) {
+        if (i !== idx) {
+          await mpv.append(client, items[i].url)
+        }
       }
     })
 
