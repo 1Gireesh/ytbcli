@@ -79,9 +79,7 @@ const command: CommandModule = {
     }
 
     await withClient(async (client) => {
-      if (!argv.video) {
-        await client.setProperty("video", false)
-      }
+      await client.setProperty("vid", argv.video ? 1 : 0)
 
       await mpv.playlistClear(client)
 

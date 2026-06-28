@@ -97,9 +97,7 @@ export const nextCmd: CommandModule = {
     }),
   handler: async (argv) => {
     await withClient(async (client) => {
-      if (!argv.video) {
-        await client.setProperty("video", false)
-      }
+      await client.setProperty("vid", argv.video ? 1 : 0)
       await mpv.playlistNext(client)
     })
 
@@ -128,9 +126,7 @@ export const prevCmd: CommandModule = {
     }),
   handler: async (argv) => {
     await withClient(async (client) => {
-      if (!argv.video) {
-        await client.setProperty("video", false)
-      }
+      await client.setProperty("vid", argv.video ? 1 : 0)
       await mpv.playlistPrev(client)
     })
 

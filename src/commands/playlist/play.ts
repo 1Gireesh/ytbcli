@@ -63,10 +63,14 @@ export const playCmd: CommandModule = {
     setCurrent(firstQueueItem.id)
 
     await withClient(async (client) => {
-      if (!argv.video) {
-        await client.setProperty("video", false)
-      }
+      await client.setProperty("vid", argv.video ? 1 : 0)
+      await mpv.playlistClear(client)
       await mpv.play(client, firstQueueItem!.url)
+      for (const item of itemsToPlay) {
+        if (item.url !== firstQueueItem!.url) {
+          await mpv.append(client, item.url)
+        }
+      }
     })
 
     console.log(JSON.stringify({
