@@ -96,22 +96,23 @@ export const nextCmd: CommandModule = {
       alias: "v",
     }),
   handler: async (argv) => {
-    const nextItem = next()
-    if (!nextItem) {
-      console.log("No next item in queue")
-      return
-    }
-
-    setCurrent(nextItem.id)
-
     await withClient(async (client) => {
       if (!argv.video) {
         await client.setProperty("video", false)
       }
-      await mpv.play(client, nextItem.url)
+      await mpv.playlistNext(client)
     })
 
-    console.log(JSON.stringify(nextItem, null, 2))
+    const playlist = await withClient(client => mpv.getPlaylist(client))
+    const current = playlist?.find(p => p.current)
+    const nextItem = next()
+
+    if (nextItem) {
+      setCurrent(nextItem.id)
+      console.log(JSON.stringify(nextItem, null, 2))
+    } else {
+      console.log("No next item")
+    }
   },
 }
 
@@ -126,22 +127,21 @@ export const prevCmd: CommandModule = {
       alias: "v",
     }),
   handler: async (argv) => {
-    const prevItem = prev()
-    if (!prevItem) {
-      console.log("No previous item in queue")
-      return
-    }
-
-    setCurrent(prevItem.id)
-
     await withClient(async (client) => {
       if (!argv.video) {
         await client.setProperty("video", false)
       }
-      await mpv.play(client, prevItem.url)
+      await mpv.playlistPrev(client)
     })
 
-    console.log(JSON.stringify(prevItem, null, 2))
+    const prevItem = prev()
+
+    if (prevItem) {
+      setCurrent(prevItem.id)
+      console.log(JSON.stringify(prevItem, null, 2))
+    } else {
+      console.log("No previous item")
+    }
   },
 }
 

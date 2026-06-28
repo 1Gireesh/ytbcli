@@ -2,7 +2,7 @@ import type { CommandModule } from "yargs"
 import { readFileSync } from "fs"
 import { withClient } from "./playback"
 import { commands as mpv } from "../mpv"
-import { add, clear, setCurrent } from "../db/queue"
+import { add, clear, list, setCurrent } from "../db/queue"
 import { getVideoInfo, type SearchResult } from "../ytdlp"
 import { getSearchCachePath } from "./search"
 
@@ -72,7 +72,7 @@ const command: CommandModule = {
       add(item.url, item.title, item.channel)
     }
 
-    const items = await import("../db/queue").then(m => m.list())
+    const items = list()
     const currentItem = items.find(i => i.url === selected.url)
     if (currentItem) {
       setCurrent(currentItem.id)
@@ -82,7 +82,17 @@ const command: CommandModule = {
       if (!argv.video) {
         await client.setProperty("video", false)
       }
-      await mpv.play(client, selected.url)
+
+      await mpv.playlistClear(client)
+
+      for (const item of items) {
+        await mpv.append(client, item.url)
+      }
+
+      const idx = items.findIndex(i => i.url === selected.url)
+      if (idx >= 0) {
+        await mpv.playlistPlayIndex(client, idx)
+      }
     })
 
     console.log(`Playing: ${selected.title}`)
