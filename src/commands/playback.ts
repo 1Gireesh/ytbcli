@@ -1,8 +1,45 @@
 import type { CommandModule } from "yargs"
+import { existsSync, unlinkSync } from "fs"
+import { execSync } from "child_process"
 import { MpvClient, commands as mpv } from "../mpv"
 import { current, next, prev, setCurrent, getPosition, setPosition, clear } from "../db/queue"
 
+const SOCKET_PATH = process.env.MPV_SOCKET || "/tmp/mpvsocket"
+
+async function ensureMpv(): Promise<void> {
+  if (existsSync(SOCKET_PATH)) {
+    try {
+      const client = new MpvClient()
+      await client.connect()
+      client.disconnect()
+      return
+    } catch {
+      try { unlinkSync(SOCKET_PATH) } catch {}
+    }
+  }
+
+  execSync("mpv --idle --input-ipc-server=" + SOCKET_PATH + " &", {
+    stdio: "ignore",
+    shell: true,
+  })
+
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 100))
+    if (existsSync(SOCKET_PATH)) {
+      try {
+        const client = new MpvClient()
+        await client.connect()
+        client.disconnect()
+        return
+      } catch {}
+    }
+  }
+
+  throw new Error("Failed to start mpv")
+}
+
 export async function withClient<T>(fn: (client: MpvClient) => Promise<T>): Promise<T> {
+  await ensureMpv()
   const client = new MpvClient()
   try {
     await client.connect()
