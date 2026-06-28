@@ -1,10 +1,30 @@
 import type { CommandModule } from "yargs"
 import { existsSync, unlinkSync } from "fs"
-import { execSync } from "child_process"
+import { execSync, exec } from "child_process"
 import { MpvClient, commands as mpv } from "../mpv"
 import { current, next, prev, setCurrent, getPosition, setPosition, clear } from "../db/queue"
 
 const SOCKET_PATH = process.env.MPV_SOCKET || "/tmp/mpvsocket"
+
+function killMpvForSocket(): void {
+  try {
+    const output = execSync("ps aux | grep 'mpv.*input-ipc-server=" + SOCKET_PATH + "' | grep -v grep", {
+      encoding: "utf-8",
+    })
+    const pids = output.trim().split("\n").filter(Boolean).map(line => {
+      const parts = line.trim().split(/\s+/)
+      return parts[1]
+    }).filter(Boolean)
+
+    for (const pid of pids) {
+      try { execSync("kill " + pid) } catch {}
+    }
+
+    if (existsSync(SOCKET_PATH)) {
+      try { unlinkSync(SOCKET_PATH) } catch {}
+    }
+  } catch {}
+}
 
 async function ensureMpv(): Promise<void> {
   if (existsSync(SOCKET_PATH)) {
@@ -14,7 +34,7 @@ async function ensureMpv(): Promise<void> {
       client.disconnect()
       return
     } catch {
-      try { unlinkSync(SOCKET_PATH) } catch {}
+      killMpvForSocket()
     }
   }
 

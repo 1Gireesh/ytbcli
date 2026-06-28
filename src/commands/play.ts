@@ -92,6 +92,8 @@ const command: CommandModule = {
           await mpv.append(client, items[i].url)
         }
       }
+
+      await mpv.unpause(client)
     })
 
     console.log(`Playing: ${selected.title}`)
