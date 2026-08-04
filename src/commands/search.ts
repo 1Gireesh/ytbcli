@@ -40,7 +40,11 @@ const command: CommandModule = {
         return
       }
 
-      writeFileSync(SEARCH_CACHE, JSON.stringify(results, null, 2))
+      writeFileSync(SEARCH_CACHE, JSON.stringify({
+        query: argv.query as string,
+        timestamp: Date.now(),
+        results,
+      }, null, 2))
 
       if (argv.json) {
         console.log(JSON.stringify(results, null, 2))
