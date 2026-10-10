@@ -1,6 +1,6 @@
 import type { CommandModule } from "yargs"
 import { readFileSync } from "fs"
-import { withClient } from "./playback"
+import { withClient, syncQueueToMpv } from "./playback"
 import { MpvClient, commands as mpv } from "../mpv"
 import { add, clear, list, setCurrent } from "../db/queue"
 import { getRepeatMode } from "../db/playback"
@@ -8,13 +8,13 @@ import { addToHistory } from "../db/history"
 import { getVideoInfo, type SearchResult } from "../ytdlp"
 import { getSearchCachePath } from "./search"
 
-interface SearchCache {
+export interface SearchCache {
   query?: string
   timestamp?: number
   results: SearchResult[]
 }
 
-function loadSearchCache(): SearchCache | null {
+export function loadSearchCache(): SearchCache | null {
   const cachePath = getSearchCachePath()
   try {
     const raw = JSON.parse(readFileSync(cachePath, "utf-8"))
@@ -31,17 +31,20 @@ function loadSearchCache(): SearchCache | null {
   }
 }
 
-function playSingle(url: string, video: boolean): Promise<void> {
-  return withClient(async (client: MpvClient) => {
-    await mpv.playlistClear(client)
-    await mpv.play(client, url)
-    await mpv.setVideoEnabled(client, video)
-    await mpv.setRepeatMode(client, getRepeatMode())
-    await mpv.unpause(client)
+async function playSingle(url: string, video: boolean): Promise<void> {
+  const items = list()
+  let currentItem = items.find(i => i.url === url)
+  if (!currentItem) {
+    currentItem = add(url)
+  }
+  setCurrent(currentItem.id)
+
+  await withClient(async (client: MpvClient) => {
+    await syncQueueToMpv(client, url, video)
   })
 }
 
-function computeDurationSecs(duration: string): number | undefined {
+export function computeDurationSecs(duration: string): number | undefined {
   const parts = duration.split(":").map(Number)
   if (parts.length === 2 && parts[0] !== undefined && parts[1] !== undefined) return parts[0] * 60 + parts[1]
   if (parts.length === 3 && parts[0] !== undefined && parts[1] !== undefined && parts[2] !== undefined) {
@@ -50,7 +53,7 @@ function computeDurationSecs(duration: string): number | undefined {
   return undefined
 }
 
-function isVideoID(s: string): boolean {
+export function isVideoID(s: string): boolean {
   return /^[a-zA-Z0-9_-]{11}$/.test(s)
 }
 
@@ -158,22 +161,7 @@ const command: CommandModule = {
     }
 
     await withClient(async (client) => {
-      await mpv.playlistClear(client)
-
-      const idx = items.findIndex(i => i.url === selected.url)
-
-      await mpv.play(client, selected.url)
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        if (item && i !== idx) {
-          await mpv.append(client, item.url)
-        }
-      }
-
-      await mpv.setVideoEnabled(client, video)
-      await mpv.setRepeatMode(client, getRepeatMode())
-      await mpv.unpause(client)
+      await syncQueueToMpv(client, selected.url, video)
     })
 
     addToHistory(selected.url, selected.title, selected.channel, computeDurationSecs(selected.duration))

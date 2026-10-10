@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ytbcli</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; max-width: 960px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.3rem; margin-bottom: 14px; color: #f0f6fc; letter-spacing: -0.5px; }
+  h1 span { color: #8b949e; font-weight: 400; font-size: 0.8rem; margin-left: 8px; }
+
+  .tabs { display: flex; gap: 2px; margin-bottom: 16px; background: #161b22; border-radius: 8px; padding: 3px; }
+  .tabs button { flex: 1; background: none; color: #8b949e; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: all 0.15s; }
+  .tabs button.active { background: #21262d; color: #f0f6fc; }
+  .tabs button:hover:not(.active) { color: #c9d1d9; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .section { margin-bottom: 16px; padding: 14px; background: #161b22; border: 1px solid #21262d; border-radius: 8px; }
+  .section h2 { font-size: 0.85rem; color: #f0f6fc; margin-bottom: 10px; font-weight: 600; }
+  .section h3 { font-size: 0.78rem; color: #8b949e; margin: 10px 0 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: flex-end; }
+  .col { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
+  input, select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 7px 10px; border-radius: 6px; font-size: 0.82rem; width: 100%; }
+  input:focus, select:focus { outline: none; border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+  input::placeholder { color: #484f58; }
+  select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px; }
+  label { font-size: 0.75rem; color: #8b949e; margin-bottom: 1px; display: block; }
+
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  button.btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; white-space: nowrap; transition: all 0.15s; }
+  button.btn:hover { background: #30363d; color: #f0f6fc; border-color: #8b949e; }
+  button.btn.primary { background: #238636; border-color: #2ea043; color: #fff; }
+  button.btn.primary:hover { background: #2ea043; }
+  button.btn.danger { background: #21262d; border-color: #f8514966; color: #f85149; }
+  button.btn.danger:hover { background: #da363322; border-color: #f85149; }
+  button.btn.sm { padding: 4px 8px; font-size: 0.75rem; }
+  button.btn.active-filter { background: #1f6feb33; border-color: #1f6feb; color: #58a6ff; }
+
+  .list { display: flex; flex-direction: column; gap: 2px; }
+  .item { display: flex; align-items: center; gap: 8px; background: #0d1117; padding: 8px 10px; border-radius: 6px; border: 1px solid transparent; transition: border-color 0.15s; }
+  .item:hover { border-color: #21262d; }
+  .item .idx { color: #484f58; font-size: 0.75rem; min-width: 20px; text-align: right; font-variant-numeric: tabular-nums; }
+  .item .info { flex: 1; overflow: hidden; min-width: 0; }
+  .item .title { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c9d1d9; }
+  .item .sub { font-size: 0.72rem; color: #484f58; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .item .badge { font-size: 0.68rem; background: #30363d; color: #8b949e; padding: 1px 6px; border-radius: 10px; white-space: nowrap; }
+  .item .actions { display: flex; gap: 2px; }
+  .item button { background: none; border: none; color: #484f58; cursor: pointer; font-size: 0.85rem; padding: 3px 5px; border-radius: 4px; line-height: 1; }
+  .item button:hover { color: #c9d1d9; background: #21262d; }
+  .item button.del:hover { color: #f85149; }
+  .item.current { border-color: #238636; background: #0d1117; }
+  .item.current .title { color: #3fb950; }
+
+  .stats { color: #484f58; font-size: 0.75rem; margin-bottom: 6px; display: flex; gap: 12px; }
+  .stats span { display: flex; align-items: center; gap: 4px; }
+  .empty { color: #30363d; font-size: 0.82rem; padding: 24px; text-align: center; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #238636; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 0.82rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 100; }
+  .toast.show { opacity: 1; }
+  .toast.error { background: #da3633; }
+
+  .inline-form { display: flex; gap: 6px; align-items: flex-end; }
+  .inline-form .col { min-width: 0; flex: 1; }
+  details { margin-bottom: 8px; }
+  details summary { cursor: pointer; font-size: 0.8rem; color: #58a6ff; padding: 4px 0; }
+  details summary:hover { color: #79c0ff; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>ytbcli <span>web ui</span></h1>
+
+<div class="tabs">
+  <button class="active" onclick="showTab('playlists')">Playlists</button>
+  <button onclick="showTab('queue')">Queue</button>
+  <button onclick="showTab('history')">History</button>
+  <button onclick="showTab('config')">Config</button>
+  <button onclick="showTab('data')">Data</button>
+</div>
+
+<!-- ═══════════════════ PLAYLISTS ═══════════════════ -->
+<div id="playlists" class="panel active">
+  <div class="section">
+    <h2>Create Playlist</h2>
+    <div class="inline-form">
+      <div class="col"><input id="newPlName" placeholder="playlist name" onkeydown="if(event.key==='Enter')createPlaylist()"></div>
+      <button class="btn primary" onclick="createPlaylist()">Create</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Playlists</h2>
+    <div id="playlistList" class="list"></div>
+  </div>
+
+  <div id="plDetail" style="display:none">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h2 id="plDetailName"></h2>
+        <div class="btn-row">
+          <button class="btn sm" onclick="renamePlaylistPrompt()">Rename</button>
+          <button class="btn sm" onclick="copyPlaylistPrompt()">Copy</button>
+          <button class="btn sm" onclick="mergePlaylistPrompt()">Merge</button>
+          <button class="btn sm" onclick="clearPlaylist()">Clear</button>
+          <button class="btn sm danger" onclick="deletePlaylist()">Delete</button>
+        </div>
+      </div>
+
+      <h3>Add Item</h3>
+      <div class="grid-2">
+        <div class="col"><label>URL</label><input id="plItemUrl" placeholder="https://youtube.com/watch?v=..."></div>
+        <div class="col"><label>Title</label><input id="plItemTitle" placeholder="optional" onkeydown="if(event.key==='Enter')addPlaylistItem()"></div>
+      </div>
+      <button class="btn primary" onclick="addPlaylistItem()" style="margin-top:6px">Add</button>
+
+      <h3>Items</h3>
+      <div class="row" style="margin-bottom:6px">
+        <input id="plSearch" placeholder="Search..." oninput="searchPlaylistItems()" style="flex:1">
+        <select id="plSortBy" onchange="sortPlaylistItems()" style="width:auto">
+          <option value="position">Sort: Position</option>
+          <option value="title">Sort: Title</option>
+          <option value="url">Sort: URL</option>
+        </select>
+        <button class="btn sm" id="plSortDir" onclick="togglePlSortDir()">↑</button>
+        <button class="btn sm" onclick="dedupPlaylist()">Dedup</button>
+        <button class="btn sm" onclick="showDupes()">Dupes</button>
+      </div>
+      <div id="plItemsStats" class="stats"></div>
+      <div id="plItems" class="list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ QUEUE ═══════════════════ -->
+<div id="queue" class="panel">
+  <div class="section">
+    <h2>Add to Queue</h2>
+    <div class="col"><label>URL</label><input id="qUrl" placeholder="https://youtube.com/watch?v=..."></div>
+    <div class="grid-2" style="margin-top:6px">
+      <div class="col"><label>Title</label><input id="qTitle" placeholder="optional"></div>
+      <div class="col"><label>Channel</label><input id="qChannel" placeholder="optional"></div>
+    </div>
+    <button class="btn primary" onclick="addQueueItem()" style="margin-top:6px">Add</button>
+  </div>
+
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h2 style="margin:0">Queue</h2>
+      <div class="btn-row">
+        <button class="btn sm" onclick="shuffleQueue()">Shuffle</button>
+        <button class="btn sm danger" onclick="clearQueue()">Clear</button>
+      </div>
+    </div>
+    <div id="queueStats" class="stats"></div>
+    <div id="queueItems" class="list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ HISTORY ═══════════════════ -->
+<div id="history" class="panel">
+  <div class="section">
+    <h2>Add to History</h2>
+    <div class="col"><label>URL</label><input id="hUrl" placeholder="https://youtube.com/watch?v=..."></div>
+    <div class="grid-2" style="margin-top:6px">
+      <div class="col"><label>Title</label><input id="hTitle" placeholder="optional"></div>
+      <div class="col"><label>Channel</label><input id="hChannel" placeholder="optional"></div>
+    </div>
+    <div class="grid-2" style="margin-top:6px">
+      <div class="col"><label>Duration (sec)</label><input id="hDuration" type="number" placeholder="optional"></div>
+      <div class="col"></div>
+    </div>
+    <button class="btn primary" onclick="addHistoryItem()" style="margin-top:6px">Add</button>
+  </div>
+
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h2 style="margin:0">History</h2>
+      <div class="btn-row">
+        <button class="btn sm" onclick="showHistoryStats()">Stats</button>
+        <button class="btn sm" onclick="showTopItems()">Top</button>
+        <button class="btn sm" onclick="showRecentItems()">Recent</button>
+        <button class="btn sm" onclick="showUniqueItems()">Unique</button>
+        <button class="btn sm" onclick="dedupHistory()">Dedup</button>
+        <button class="btn sm danger" onclick="clearHistory()">Clear</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-bottom:6px">
+      <input id="hSearch" placeholder="Search..." oninput="filterHistory()" style="flex:1">
+      <select id="hSearchField" onchange="filterHistory()" style="width:auto">
+        <option value="all">All fields</option>
+        <option value="title">Title</option>
+        <option value="url">URL</option>
+        <option value="channel">Channel</option>
+      </select>
+      <select id="hSortBy" onchange="loadHistory()" style="width:auto">
+        <option value="date">Sort: Date</option>
+        <option value="title">Sort: Title</option>
+        <option value="url">Sort: URL</option>
+        <option value="channel">Sort: Channel</option>
+      </select>
+    </div>
+
+    <div id="historyStats" class="stats"></div>
+    <div id="historyItems" class="list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ CONFIG ═══════════════════ -->
+<div id="config" class="panel">
+  <div class="section">
+    <h2>Set Config</h2>
+    <div class="grid-2">
+      <div class="col"><label>Key</label><input id="cKey" placeholder="key"></div>
+      <div class="col"><label>Value</label><input id="cValue" placeholder="value" onkeydown="if(event.key==='Enter')setConfigItem()"></div>
+    </div>
+    <button class="btn primary" onclick="setConfigItem()" style="margin-top:6px">Set</button>
+  </div>
+
+  <div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h2 style="margin:0">Config</h2>
+      <button class="btn sm danger" onclick="clearConfig()">Clear All</button>
+    </div>
+    <div id="configItems" class="list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ DATA ═══════════════════ -->
+<div id="data" class="panel">
+  <div class="section">
+    <h2>Export</h2>
+    <p style="font-size:0.8rem;color:#8b949e;margin-bottom:8px">Downloads a JSON file with all your data.</p>
+    <button class="btn primary" onclick="exportData()">Export All Data</button>
+  </div>
+
+  <div class="section">
+    <h2>Import</h2>
+    <p style="font-size:0.8rem;color:#8b949e;margin-bottom:8px">Paste JSON data or load from file. Toggle merge to keep existing data.</p>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;color:#8b949e;cursor:pointer">
+        <input type="checkbox" id="importMerge"> Merge with existing
+      </label>
+    </div>
+    <div class="col"><textarea id="importData" rows="6" style="background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px;border-radius:6px;font-size:0.8rem;font-family:monospace;width:100%;resize:vertical" placeholder='Paste JSON here or use "Load File"...'></textarea></div>
+    <div class="btn-row" style="margin-top:6px">
+      <button class="btn" onclick="document.getElementById('importFile').click()">Load File</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="loadImportFile(event)">
+      <button class="btn primary" onclick="importData()">Import</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- ═══════════════════ MODAL ═══════════════════ -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:#0d1117cc;z-index:50;display:none;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;min-width:320px;max-width:500px;width:90%">
+    <h3 id="modalTitle" style="color:#f0f6fc;font-size:0.9rem;margin-bottom:12px"></h3>
+    <div id="modalBody"></div>
+    <div class="btn-row" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" id="modalOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const api = (path, opts) => fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts }).then(r => r.json());
+let allHistory = [];
+let plSortReverse = false;
+
+function toast(msg, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => el.className = 'toast', 2000);
+}
+
+function showModal(title, bodyHtml, onOk) {
+  const m = document.getElementById('modal');
+  m.style.display = 'flex';
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalOk').onclick = () => { onOk(); closeModal(); };
+}
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+function showTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  document.querySelector(`.tabs button[onclick="showTab('${name}')"]`).classList.add('active');
+  if (name === 'playlists') loadPlaylists();
+  if (name === 'queue') loadQueue();
+  if (name === 'history') loadHistory();
+  if (name === 'config') loadConfig();
+}
+
+// ═══════════════════ PLAYLISTS ═══════════════════
+let playlists = [];
+let currentPl = null;
+
+async function loadPlaylists() {
+  playlists = await api('/api/playlists');
+  const el = document.getElementById('playlistList');
+  if (!playlists.length) { el.innerHTML = '<div class="empty">No playlists yet</div>'; return; }
+  el.innerHTML = playlists.map(p => `
+    <div class="item" style="cursor:pointer" onclick="selectPlaylist('${p.name}')">
+      <div class="info">
+        <div class="title">${p.name}</div>
+        <div class="sub">${p.itemCount} item${p.itemCount !== 1 ? 's' : ''}</div>
+      </div>
+      <span class="badge">view</span>
+    </div>
+  `).join('');
+  if (currentPl) {
+    const exists = playlists.find(p => p.name === currentPl);
+    if (exists) selectPlaylist(currentPl);
+    else { currentPl = null; document.getElementById('plDetail').style.display = 'none'; }
+  }
+}
+
+async function selectPlaylist(name) {
+  currentPl = name;
+  document.getElementById('plDetail').style.display = '';
+  document.getElementById('plDetailName').textContent = name;
+  document.getElementById('plSearch').value = '';
+  await loadPlaylistItems();
+}
+
+async function createPlaylist() {
+  const name = document.getElementById('newPlName').value.trim();
+  if (!name) return;
+  const r = await api('/api/playlists', { method: 'POST', body: JSON.stringify({ name }) });
+  if (r.error) return toast(r.error, true);
+  document.getElementById('newPlName').value = '';
+  toast('Created ' + name);
+  loadPlaylists();
+}
+
+async function deletePlaylist() {
+  if (!currentPl) return;
+  if (!confirm(`Delete "${currentPl}"?`)) return;
+  await api(`/api/playlists/${enc(currentPl)}`, { method: 'DELETE' });
+  currentPl = null;
+  document.getElementById('plDetail').style.display = 'none';
+  toast('Deleted');
+  loadPlaylists();
+}
+
+async function renamePlaylistPrompt() {
+  if (!currentPl) return;
+  const newName = prompt(`Rename "${currentPl}" to:`, currentPl);
+  if (!newName || newName === currentPl) return;
+  const r = await api(`/api/playlists/${enc(currentPl)}`, { method: 'PATCH', body: JSON.stringify({ name: newName }) });
+  if (r.error) return toast(r.error, true);
+  currentPl = newName;
+  toast('Renamed');
+  loadPlaylists();
+}
+
+async function copyPlaylistPrompt() {
+  if (!currentPl) return;
+  const dest = prompt(`Copy "${currentPl}" to:`, currentPl + '-copy');
+  if (!dest) return;
+  const r = await api(`/api/playlists/${enc(currentPl)}/copy`, { method: 'POST', body: JSON.stringify({ name: dest }) });
+  if (r.error) return toast(r.error, true);
+  toast(`Copied ${r.itemCount} items`);
+  loadPlaylists();
+}
+
+async function mergePlaylistPrompt() {
+  if (!currentPl) return;
+  const dest = prompt(`Merge "${currentPl}" into:`, '');
+  if (!dest) return;
+  const r = await api(`/api/playlists/${enc(currentPl)}/merge`, { method: 'POST', body: JSON.stringify({ name: dest }) });
+  if (r.error) return toast(r.error, true);
+  toast(`Merged ${r.addedCount} items`);
+  loadPlaylists();
+}
+
+async function clearPlaylist() {
+  if (!currentPl) return;
+  if (!confirm(`Clear all items in "${currentPl}"?`)) return;
+  const r = await api(`/api/playlists/${enc(currentPl)}/clear`, { method: 'POST' });
+  toast(`Cleared ${r.cleared} items`);
+  loadPlaylistItems();
+}
+
+let plItems = [];
+async function loadPlaylistItems() {
+  if (!currentPl) return;
+  plItems = await api(`/api/playlists/${enc(currentPl)}/items`);
+  renderPlItems(plItems);
+}
+
+function renderPlItems(items) {
+  document.getElementById('plItemsStats').textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
+  const el = document.getElementById('plItems');
+  if (!items.length) { el.innerHTML = '<div class="empty">No items</div>'; return; }
+  el.innerHTML = items.map((it, i) => `
+    <div class="item">
+      <span class="idx">${it.position + 1}</span>
+      <div class="info">
+        <div class="title">${esc(it.title || '(no title)')}</div>
+        <div class="sub">${esc(it.url)}</div>
+      </div>
+      <div class="actions">
+        <button onclick="movePlItem(${it.position},${it.position-1})" title="Up">↑</button>
+        <button onclick="movePlItem(${it.position},${it.position+1})" title="Down">↓</button>
+        <button onclick="editPlItem(${i})" title="Edit">✎</button>
+        <button onclick="removePlItem(${it.position})" class="del" title="Remove">&times;</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function searchPlaylistItems() {
+  const q = document.getElementById('plSearch').value.toLowerCase();
+  if (!q) return renderPlItems(plItems);
+  renderPlItems(plItems.filter(it => (it.title||'').toLowerCase().includes(q) || it.url.toLowerCase().includes(q)));
+}
+
+function togglePlSortDir() {
+  plSortReverse = !plSortReverse;
+  document.getElementById('plSortDir').textContent = plSortReverse ? '↓' : '↑';
+  sortPlaylistItems();
+}
+
+async function sortPlaylistItems() {
+  const by = document.getElementById('plSortBy').value;
+  await api(`/api/playlists/${enc(currentPl)}/sort`, { method: 'POST', body: JSON.stringify({ by, reverse: plSortReverse }) });
+  await loadPlaylistItems();
+}
+
+async function dedupPlaylist() {
+  const r = await api(`/api/playlists/${enc(currentPl)}/dedup`, { method: 'POST' });
+  toast(`Removed ${r.removed} duplicates`);
+  loadPlaylistItems();
+}
+
+async function showDupes() {
+  const dupes = await api(`/api/playlists/${enc(currentPl)}/dupes`);
+  if (!dupes.length) return toast('No duplicates found');
+  const html = dupes.map(d => `<div style="margin-bottom:6px;font-size:0.8rem"><strong>${d.count}x</strong> ${esc(d.url)}</div>`).join('');
+  showModal(`${dupes.length} duplicate group(s)`, html, () => {});
+}
+
+async function addPlaylistItem() {
+  if (!currentPl) return;
+  const url = document.getElementById('plItemUrl').value.trim();
+  if (!url) return;
+  const title = document.getElementById('plItemTitle').value.trim();
+  await api(`/api/playlists/${enc(currentPl)}/items`, { method: 'POST', body: JSON.stringify({ url, title: title || undefined }) });
+  document.getElementById('plItemUrl').value = '';
+  document.getElementById('plItemTitle').value = '';
+  loadPlaylistItems();
+}
+
+async function removePlItem(index) {
+  await api(`/api/playlists/${enc(currentPl)}/items/${index}`, { method: 'DELETE' });
+  loadPlaylistItems();
+}
+
+async function movePlItem(from, to) {
+  if (to < 0) return;
+  await api(`/api/playlists/${enc(currentPl)}/items/move`, { method: 'POST', body: JSON.stringify({ from, to }) });
+  loadPlaylistItems();
+}
+
+function editPlItem(index) {
+  const it = plItems[index];
+  const newTitle = prompt('Title:', it.title || '');
+  if (newTitle === null) return;
+  const newUrl = prompt('URL:', it.url);
+  if (!newUrl) return;
+  api(`/api/playlists/${enc(currentPl)}/items/${index}`, { method: 'PATCH', body: JSON.stringify({ title: newTitle || null, url: newUrl }) }).then(() => loadPlaylistItems());
+}
+
+// ═══════════════════ QUEUE ═══════════════════
+let queueItems = [];
+let queueCurrentId = null;
+
+async function loadQueue() {
+  const { items, currentId } = await api('/api/queue');
+  queueItems = items;
+  queueCurrentId = currentId;
+  document.getElementById('queueStats').textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
+  const el = document.getElementById('queueItems');
+  if (!items.length) { el.innerHTML = '<div class="empty">Queue is empty</div>'; return; }
+  el.innerHTML = items.map((it, i) => `
+    <div class="item ${it.id === queueCurrentId ? 'current' : ''}">
+      <span class="idx">${i + 1}</span>
+      <div class="info">
+        <div class="title">${esc(it.title || '(no title)')}</div>
+        <div class="sub">${it.channel ? esc(it.channel) + ' · ' : ''}${esc(it.url)}</div>
+      </div>
+      <div class="actions">
+        <button onclick="setQueueCurrent(${it.id})" title="Set current" ${it.id===queueCurrentId?'style="color:#3fb950"':''}>▶</button>
+        <button onclick="moveQueue(${i},${i-1})" title="Up">↑</button>
+        <button onclick="moveQueue(${i},${i+1})" title="Down">↓</button>
+        <button onclick="removeQueueItem(${i})" class="del" title="Remove">&times;</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addQueueItem() {
+  const url = document.getElementById('qUrl').value.trim();
+  if (!url) return;
+  const title = document.getElementById('qTitle').value.trim();
+  const channel = document.getElementById('qChannel').value.trim();
+  await api('/api/queue', { method: 'POST', body: JSON.stringify({ url, title: title || undefined, channel: channel || undefined }) });
+  document.getElementById('qUrl').value = '';
+  document.getElementById('qTitle').value = '';
+  document.getElementById('qChannel').value = '';
+  toast('Added to queue');
+  loadQueue();
+}
+
+async function removeQueueItem(index) {
+  await api(`/api/queue/${index}`, { method: 'DELETE' });
+  loadQueue();
+}
+
+async function moveQueue(from, to) {
+  if (to < 0) return;
+  await api('/api/queue/move', { method: 'POST', body: JSON.stringify({ from, to }) });
+  loadQueue();
+}
+
+async function setQueueCurrent(id) {
+  await api('/api/queue/current', { method: 'POST', body: JSON.stringify({ queueId: id }) });
+  loadQueue();
+}
+
+async function shuffleQueue() {
+  await api('/api/queue/shuffle', { method: 'POST' });
+  toast('Shuffled');
+  loadQueue();
+}
+
+async function clearQueue() {
+  if (!confirm('Clear entire queue?')) return;
+  await api('/api/queue', { method: 'DELETE' });
+  toast('Queue cleared');
+  loadQueue();
+}
+
+// ═══════════════════ HISTORY ═══════════════════
+async function loadHistory() {
+  const sort = document.getElementById('hSortBy').value;
+  if (sort === 'date') {
+    allHistory = await api('/api/history');
+  } else {
+    allHistory = await api(`/api/history/sort?by=${sort}`);
+  }
+  filterHistory();
+}
+
+function filterHistory() {
+  const q = document.getElementById('hSearch').value.trim().toLowerCase();
+  const field = document.getElementById('hSearchField').value;
+  let items = allHistory;
+  if (q) {
+    items = items.filter(it => {
+      const vals = field === 'all' ? [it.title, it.url, it.channel] : [it[field]];
+      return vals.some(v => (v||'').toLowerCase().includes(q));
+    });
+  }
+  document.getElementById('historyStats').textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
+  renderHistory(items);
+}
+
+function renderHistory(items) {
+  const el = document.getElementById('historyItems');
+  if (!items.length) { el.innerHTML = '<div class="empty">No history</div>'; return; }
+  el.innerHTML = items.slice(0, 200).map(it => `
+    <div class="item">
+      <div class="info">
+        <div class="title">${esc(it.title || '(no title)')}</div>
+        <div class="sub">${it.channel ? esc(it.channel) + ' · ' : ''}${esc(it.url)}${it.duration ? ' · ' + formatDur(it.duration) : ''}</div>
+      </div>
+      <div class="actions">
+        <button onclick="deleteHistoryItem(${it.id})" class="del" title="Remove">&times;</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addHistoryItem() {
+  const url = document.getElementById('hUrl').value.trim();
+  if (!url) return;
+  const title = document.getElementById('hTitle').value.trim();
+  const channel = document.getElementById('hChannel').value.trim();
+  const duration = document.getElementById('hDuration').value ? parseInt(document.getElementById('hDuration').value) : undefined;
+  await api('/api/history', { method: 'POST', body: JSON.stringify({ url, title: title || undefined, channel: channel || undefined, duration }) });
+  document.getElementById('hUrl').value = '';
+  document.getElementById('hTitle').value = '';
+  document.getElementById('hChannel').value = '';
+  document.getElementById('hDuration').value = '';
+  toast('Added to history');
+  loadHistory();
+}
+
+async function deleteHistoryItem(id) {
+  await api(`/api/history/${id}`, { method: 'DELETE' });
+  loadHistory();
+}
+
+async function clearHistory() {
+  if (!confirm('Clear entire history?')) return;
+  await api('/api/history', { method: 'DELETE' });
+  toast('History cleared');
+  loadHistory();
+}
+
+async function dedupHistory() {
+  const r = await api('/api/history/dedup', { method: 'POST' });
+  toast(`Removed ${r.removed} duplicates`);
+  loadHistory();
+}
+
+async function showHistoryStats() {
+  const s = await api('/api/history/stats');
+  showModal('History Stats', `
+    <div style="font-size:0.85rem;line-height:1.8">
+      <div>Total plays: <strong>${s.total}</strong></div>
+      <div>Unique videos: <strong>${s.uniqueUrls}</strong></div>
+      <div>Channels: <strong>${s.channels.length}</strong></div>
+      ${s.channels.length ? '<div style="margin-top:6px;color:#8b949e;font-size:0.78rem">' + s.channels.map(c => esc(c)).join(', ') + '</div>' : ''}
+    </div>
+  `, () => {});
+}
+
+async function showTopItems() {
+  const items = await api('/api/history/top?count=15');
+  const html = items.map((it, i) => `
+    <div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:0.82rem;border-bottom:1px solid #21262d">
+      <span style="color:#484f58;min-width:20px;text-align:right">${i+1}.</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title || it.url)}</span>
+      <span class="badge">${it.playCount}x</span>
+    </div>
+  `).join('');
+  showModal('Top Played', html, () => {});
+}
+
+async function showRecentItems() {
+  const items = await api('/api/history/recent?count=20');
+  renderHistory(items);
+  document.getElementById('historyStats').textContent = `Recent ${items.length} items`;
+}
+
+async function showUniqueItems() {
+  const items = await api('/api/history/unique');
+  renderHistory(items);
+  document.getElementById('historyStats').textContent = `${items.length} unique items`;
+}
+
+// ═══════════════════ CONFIG ═══════════════════
+async function loadConfig() {
+  const items = await api('/api/config');
+  const el = document.getElementById('configItems');
+  if (!items.length) { el.innerHTML = '<div class="empty">No config set</div>'; return; }
+  el.innerHTML = items.map(it => `
+    <div class="item">
+      <div class="info">
+        <div class="title">${esc(it.key)}</div>
+        <div class="sub">${esc(it.value)}</div>
+      </div>
+      <div class="actions">
+        <button onclick="editConfig('${esc(it.key)}','${esc(it.value)}')" title="Edit">✎</button>
+        <button onclick="deleteConfigItem('${esc(it.key)}')" class="del" title="Remove">&times;</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function setConfigItem() {
+  const key = document.getElementById('cKey').value.trim();
+  const value = document.getElementById('cValue').value.trim();
+  if (!key || !value) return;
+  await api('/api/config', { method: 'POST', body: JSON.stringify({ key, value }) });
+  document.getElementById('cKey').value = '';
+  document.getElementById('cValue').value = '';
+  toast('Config set');
+  loadConfig();
+}
+
+function editConfig(key, value) {
+  const newValue = prompt(`Value for "${key}":`, value);
+  if (newValue === null) return;
+  api('/api/config', { method: 'POST', body: JSON.stringify({ key, value: newValue }) }).then(() => { toast('Updated'); loadConfig(); });
+}
+
+async function deleteConfigItem(key) {
+  await api(`/api/config/${enc(key)}`, { method: 'DELETE' });
+  toast('Deleted');
+  loadConfig();
+}
+
+async function clearConfig() {
+  if (!confirm('Clear all config?')) return;
+  await api('/api/config', { method: 'DELETE' });
+  toast('Config cleared');
+  loadConfig();
+}
+
+// ═══════════════════ DATA ═══════════════════
+async function exportData() {
+  const data = await api('/api/export');
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ytcli-export-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  toast('Exported');
+}
+
+function loadImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById('importData').value = reader.result; };
+  reader.readAsText(file);
+}
+
+async function importData() {
+  const raw = document.getElementById('importData').value.trim();
+  if (!raw) return toast('No data to import', true);
+  let data;
+  try { data = JSON.parse(raw); } catch { return toast('Invalid JSON', true); }
+  const merge = document.getElementById('importMerge').checked;
+  const r = await api('/api/import', { method: 'POST', body: JSON.stringify({ data, merge }) });
+  if (r.error) return toast(r.error, true);
+  toast(`Imported ${r.imported} items`);
+  document.getElementById('importData').value = '';
+}
+
+// ═══════════════════ UTILS ═══════════════════
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function enc(s) { return encodeURIComponent(s); }
+function formatDur(s) { const m = Math.floor(s/60); const sec = s%60; return `${m}:${sec.toString().padStart(2,'0')}`; }
+
+loadPlaylists();
+</script>
+</body>
+</html>

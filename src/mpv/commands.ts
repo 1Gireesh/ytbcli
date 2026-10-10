@@ -4,6 +4,22 @@ export const play = (client: MpvClient, url: string) => client.command("loadfile
 export const append = (client: MpvClient, url: string) => client.command("loadfile", url, "append")
 export const pause = (client: MpvClient) => client.setProperty("pause", true)
 export const unpause = (client: MpvClient) => client.setProperty("pause", false)
+export const setVideoEnabled = (client: MpvClient, enabled: boolean) =>
+  client.setProperty("vid", enabled ? "auto" : "no")
+export const setRepeatMode = async (client: MpvClient, mode: "off" | "one" | "all") => {
+  if (mode === "one") {
+    await client.setProperty("loop-file", "inf")
+    await client.setProperty("loop-playlist", "no")
+    return
+  }
+  if (mode === "all") {
+    await client.setProperty("loop-file", "no")
+    await client.setProperty("loop-playlist", "inf")
+    return
+  }
+  await client.setProperty("loop-file", "no")
+  await client.setProperty("loop-playlist", "no")
+}
 export const togglePause = (client: MpvClient) => client.command("cycle", "pause")
 export const stop = (client: MpvClient) => client.command("stop")
 export const seek = (client: MpvClient, seconds: number, mode?: "relative" | "absolute") =>

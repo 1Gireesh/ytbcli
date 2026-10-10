@@ -2,6 +2,9 @@
   "name": "ytbcli",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "web": "bun run src/server.ts"
+  },
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",

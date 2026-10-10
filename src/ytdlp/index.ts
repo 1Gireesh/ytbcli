@@ -1,4 +1,5 @@
 import { spawn } from "child_process"
+import { mkdirSync } from "fs"
 
 export interface SearchResult {
   id: string
@@ -94,13 +95,15 @@ function runYtdlp(args: string[], timeout = 60000): Promise<string> {
       stderr += data.toString()
     })
 
-    const timer = setTimeout(() => {
-      proc.kill()
-      reject(new Error("yt-dlp timed out"))
-    }, timeout)
+    const timer = timeout > 0
+      ? setTimeout(() => {
+        proc.kill()
+        reject(new Error("yt-dlp timed out"))
+      }, timeout)
+      : null
 
     proc.on("close", (code) => {
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
       if (code === 0) {
         resolve(stdout)
       } else {
@@ -109,7 +112,7 @@ function runYtdlp(args: string[], timeout = 60000): Promise<string> {
     })
 
     proc.on("error", (err) => {
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
       reject(err)
     })
   })
@@ -166,4 +169,45 @@ export async function getVideoInfo(url: string): Promise<{ id: string; title: st
   } catch {
     return null
   }
+}
+
+export interface DownloadAudioOptions {
+  outputDir: string
+}
+
+export async function downloadAudio(urls: string[], options: DownloadAudioOptions): Promise<void> {
+  const uniqueUrls = Array.from(new Set(urls.filter(Boolean)))
+  if (uniqueUrls.length === 0) {
+    throw new Error("No URLs to download")
+  }
+
+  mkdirSync(options.outputDir, { recursive: true })
+
+  const args = [
+    "--extract-audio",
+    "--audio-format",
+    "mp3",
+    "--audio-quality",
+    "0",
+    "--no-playlist",
+    "--output",
+    `${options.outputDir}/%(title)s [%(id)s].%(ext)s`,
+    ...uniqueUrls,
+  ]
+
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn("yt-dlp", args, {
+      stdio: "inherit",
+    })
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`yt-dlp exited with code ${code}`))
+      }
+    })
+
+    proc.on("error", reject)
+  })
 }

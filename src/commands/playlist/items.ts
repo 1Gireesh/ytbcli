@@ -1,5 +1,14 @@
 import type { CommandModule } from "yargs"
 import { addPlaylistItem, removePlaylistItem, movePlaylistItem, swapPlaylistItems, getPlaylistItems, clearPlaylist, searchPlaylist, sortPlaylist } from "../../db/playlists"
+import { PLAYLIST_CACHE_PATH, playlistCacheId, writeJsonCache } from "../cache"
+
+function writePlaylistCache(name: string, items: ReturnType<typeof getPlaylistItems>): void {
+  writeJsonCache(PLAYLIST_CACHE_PATH, {
+    cacheId: playlistCacheId(name),
+    name,
+    items,
+  })
+}
 
 export const addCmd: CommandModule = {
   command: "add <name> <url> [title]",
@@ -93,13 +102,52 @@ export const listItemsCmd: CommandModule = {
   command: "list <name>",
   describe: "List videos in a playlist",
   builder: (yargs) =>
+    yargs
+      .positional("name", {
+        description: "Playlist name",
+        type: "string",
+      })
+      .option("plain", {
+        description: "Output as: index<TAB>title-or-url",
+        type: "boolean",
+        default: false,
+      }),
+  handler: (argv) => {
+    const items = getPlaylistItems(argv.name as string)
+    writePlaylistCache(argv.name as string, items)
+    if (argv.plain) {
+      for (let i = 0; i < items.length; i++) {
+        console.log(`${i + 1}\t${items[i].title || items[i].url}`)
+      }
+      return
+    }
+    console.log(JSON.stringify(items, null, 2))
+  },
+}
+
+export const browseCmd: CommandModule = {
+  command: "browse <name>",
+  describe: "Browse playlist with numbers (for quick play by number)",
+  builder: (yargs) =>
     yargs.positional("name", {
       description: "Playlist name",
       type: "string",
     }),
   handler: (argv) => {
-    const items = getPlaylistItems(argv.name as string)
-    console.log(JSON.stringify(items, null, 2))
+    const name = argv.name as string
+    const items = getPlaylistItems(name)
+    if (items.length === 0) {
+      console.log("Playlist is empty")
+      return
+    }
+    writePlaylistCache(name, items)
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      console.log(`${i + 1}. ${item.title || item.url}`)
+      console.log(`   ${item.url}`)
+      console.log()
+    }
+    console.log("Play any result: ytcli playlist pick <number>")
   },
 }
 

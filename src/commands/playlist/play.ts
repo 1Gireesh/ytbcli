@@ -1,8 +1,59 @@
 import type { CommandModule } from "yargs"
 import { withClient } from "../playback"
 import { commands as mpv } from "../../mpv"
+import type { PlaylistItem } from "../../db/playlists"
 import { getPlaylistItems } from "../../db/playlists"
 import { add as addToQueue, clear as clearQueue, setCurrent } from "../../db/queue"
+import { addToHistory } from "../../db/history"
+import { getRepeatMode, isShuffleEnabled } from "../../db/playback"
+import { PLAYLIST_CACHE_PATH, readJsonCache, playlistCacheId } from "../cache"
+
+interface PlaylistCachePayload {
+  cacheId: string
+  name: string
+  items: PlaylistItem[]
+}
+
+async function playItems(name: string, itemsToPlay: PlaylistItem[], startIndex: number, video: boolean): Promise<void> {
+  clearQueue()
+
+  const queueItems = []
+  for (const item of itemsToPlay) {
+    queueItems.push(addToQueue(item.url, item.title || undefined))
+  }
+
+  const firstQueueItem = queueItems[startIndex] || queueItems[0]
+  if (!firstQueueItem) {
+    console.log("Playlist is empty")
+    return
+  }
+
+  setCurrent(firstQueueItem.id)
+
+  await withClient(async (client) => {
+    await mpv.playlistClear(client)
+    await mpv.play(client, itemsToPlay[0].url)
+    for (let i = 1; i < itemsToPlay.length; i++) {
+      await mpv.append(client, itemsToPlay[i].url)
+    }
+    if (startIndex > 0) {
+      await mpv.playlistPlayIndex(client, startIndex)
+    }
+    await mpv.setVideoEnabled(client, video)
+    await mpv.setRepeatMode(client, getRepeatMode())
+  })
+
+  const targetItem = itemsToPlay[startIndex] || itemsToPlay[0]
+  if (targetItem) {
+    addToHistory(targetItem.url, targetItem.title || undefined)
+  }
+
+  console.log(JSON.stringify({
+    playlist: name,
+    queueSize: itemsToPlay.length,
+    playing: firstQueueItem,
+  }, null, 2))
+}
 
 export const playCmd: CommandModule = {
   command: "play <name> [index]",
@@ -14,9 +65,9 @@ export const playCmd: CommandModule = {
         type: "string",
       })
       .positional("index", {
-        description: "Start at index",
+        description: "Start at item number (1-based)",
         type: "number",
-        default: 0,
+        default: 1,
       })
       .option("video", {
         description: "Play with video (default: audio only)",
@@ -36,47 +87,53 @@ export const playCmd: CommandModule = {
       return
     }
 
-    const startIndex = Math.min(argv.index as number, items.length - 1)
+    const requestedIndex = Math.max((argv.index as number) - 1, 0)
+    const startIndex = Math.min(requestedIndex, items.length - 1)
 
     let itemsToPlay = [...items]
-    if (argv.shuffle) {
+    if (argv.shuffle || isShuffleEnabled()) {
       for (let i = itemsToPlay.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1))
         ;[itemsToPlay[i], itemsToPlay[j]] = [itemsToPlay[j], itemsToPlay[i]]
       }
     }
 
-    clearQueue()
+    await playItems(argv.name as string, itemsToPlay, startIndex, !!argv.video)
+  },
+}
 
-    let firstQueueItem = null
-    for (const item of itemsToPlay) {
-      const queueItem = addToQueue(item.url, item.title || undefined)
-      if (itemsToPlay.indexOf(item) === startIndex) {
-        firstQueueItem = queueItem
-      }
+export const pickCmd: CommandModule = {
+  command: "pick <index>",
+  describe: "Play from the last browsed playlist by number",
+  builder: (yargs) =>
+    yargs
+      .positional("index", {
+        description: "Item number from `ytcli playlist browse <name>`",
+        type: "number",
+      })
+      .option("video", {
+        description: "Play with video (default: audio only)",
+        type: "boolean",
+        default: false,
+        alias: "v",
+      }),
+  handler: async (argv) => {
+    const cache = readJsonCache<PlaylistCachePayload>(PLAYLIST_CACHE_PATH)
+    if (!cache || !cache.items || cache.items.length === 0) {
+      console.log("No playlist browse cache. Run: ytcli playlist browse <name>")
+      return
+    }
+    if (cache.cacheId !== playlistCacheId(cache.name)) {
+      console.log("Playlist cache is invalid. Run: ytcli playlist browse <name>")
+      return
     }
 
-    if (!firstQueueItem) {
-      firstQueueItem = addToQueue(itemsToPlay[0].url, itemsToPlay[0].title || undefined)
+    const index = Math.max((argv.index as number) - 1, 0)
+    if (index >= cache.items.length) {
+      console.log(`Invalid number. Choose 1-${cache.items.length}`)
+      return
     }
 
-    setCurrent(firstQueueItem.id)
-
-    await withClient(async (client) => {
-      await client.setProperty("vid", argv.video ? 1 : 0)
-      await mpv.playlistClear(client)
-      await mpv.play(client, firstQueueItem!.url)
-      for (const item of itemsToPlay) {
-        if (item.url !== firstQueueItem!.url) {
-          await mpv.append(client, item.url)
-        }
-      }
-    })
-
-    console.log(JSON.stringify({
-      playlist: argv.name,
-      queueSize: itemsToPlay.length,
-      playing: firstQueueItem,
-    }, null, 2))
+    await playItems(cache.name, cache.items, index, !!argv.video)
   },
 }

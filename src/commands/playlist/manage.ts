@@ -70,8 +70,20 @@ export const copyCmd: CommandModule = {
 export const listCmd: CommandModule = {
   command: "names",
   describe: "List all playlist names",
-  handler: () => {
+  builder: (yargs) =>
+    yargs.option("plain", {
+      description: "Output one playlist name per line",
+      type: "boolean",
+      default: false,
+    }),
+  handler: (argv) => {
     const playlists = listPlaylists()
+    if (argv.plain) {
+      for (const playlist of playlists) {
+        console.log(playlist.name)
+      }
+      return
+    }
     console.log(JSON.stringify(playlists, null, 2))
   },
 }

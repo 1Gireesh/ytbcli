@@ -2,6 +2,8 @@ import type { CommandModule } from "yargs"
 
 import {
   addCmd,
+  playQueueCmd,
+  syncCmd,
   removeCmd,
   moveCmd,
   clearCmd,
@@ -12,6 +14,8 @@ import {
   peekCmd,
   positionCmd,
   setPositionCmd,
+  repeatCmd,
+  shuffleCmd,
 } from "./items"
 
 const command: CommandModule = {
@@ -20,6 +24,8 @@ const command: CommandModule = {
   builder: (yargs) =>
     yargs
       .command(addCmd)
+      .command(playQueueCmd)
+      .command(syncCmd)
       .command(listCmd)
       .command(currentCmd)
       .command(nextCmd)
@@ -30,6 +36,8 @@ const command: CommandModule = {
       .command(clearCmd)
       .command(positionCmd)
       .command(setPositionCmd)
+      .command(repeatCmd)
+      .command(shuffleCmd)
       .demandCommand(1, "Specify a queue action"),
   handler: () => {},
 }

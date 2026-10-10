@@ -4,13 +4,13 @@ import type { CommandModule } from "yargs"
 import { createCmd, deleteCmd, renameCmd, copyCmd, listCmd, infoCmd, mergeCmd, duplicateCmd, deduplicateCmd } from "./manage"
 
 // Item operations
-import { addCmd, removeCmd, moveCmd, swapCmd, listItemsCmd, searchCmd, filterCmd, sortCmd, clearCmd } from "./items"
+import { addCmd, removeCmd, moveCmd, swapCmd, listItemsCmd, browseCmd, searchCmd, filterCmd, sortCmd, clearCmd } from "./items"
 
 // Import/Export
 import { exportCmd, importCmd } from "./io"
 
 // Playback
-import { playCmd } from "./play"
+import { playCmd, pickCmd } from "./play"
 
 const command: CommandModule = {
   command: "playlist <action>",
@@ -33,6 +33,7 @@ const command: CommandModule = {
       .command(moveCmd)
       .command(swapCmd)
       .command(listItemsCmd)
+      .command(browseCmd)
       .command(searchCmd)
       .command(filterCmd)
       .command(sortCmd)
@@ -42,6 +43,7 @@ const command: CommandModule = {
       .command(importCmd)
       // Playback
       .command(playCmd)
+      .command(pickCmd)
       .demandCommand(1, "Specify a playlist action"),
   handler: () => {},
 }

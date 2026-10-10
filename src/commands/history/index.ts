@@ -2,6 +2,7 @@ import type { CommandModule } from "yargs"
 
 import {
   listCmd,
+  browseCmd,
   searchCmd,
   filterCmd,
   infoCmd,
@@ -15,6 +16,7 @@ import {
   topCmd,
   uniqueCmd,
   deduplicateCmd,
+  playCmd,
 } from "./items"
 
 import { exportCmd, importCmd, backupCmd, restoreCmd } from "./io"
@@ -25,6 +27,7 @@ const command: CommandModule = {
   builder: (yargs) =>
     yargs
       .command(listCmd)
+      .command(browseCmd)
       .command(searchCmd)
       .command(filterCmd)
       .command(infoCmd)
@@ -38,6 +41,7 @@ const command: CommandModule = {
       .command(topCmd)
       .command(uniqueCmd)
       .command(deduplicateCmd)
+      .command(playCmd)
       .command(exportCmd)
       .command(importCmd)
       .command(backupCmd)

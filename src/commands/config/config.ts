@@ -64,3 +64,21 @@ export const pathCmd: CommandModule = {
     console.log(getConfigPath())
   },
 }
+
+function getFzfAliases(): string {
+  return [
+    "# Requires: fzf",
+    `alias ytpl='p=$(ytcli playlist names --plain | fzf --prompt="playlist> "); [ -n "$p" ] && ytcli playlist play "$p"'`,
+    `alias ythp='i=$(ytcli history list --limit 200 --plain | fzf --delimiter=$'\\t' --with-nth=2,3 | cut -f1); [ -n "$i" ] && ytcli history play "$i" --limit 200'`,
+    `ytpp() { local p="\${1:?playlist name required}"; local i; i=$(ytcli playlist list "$p" --plain | fzf --delimiter=$'\\t' --with-nth=2 | cut -f1); [ -n "$i" ] && ytcli playlist play "$p" "$i"; }`,
+    `alias yts='q=$(printf "" | fzf --print-query --prompt="search> " | head -n1); [ -n "$q" ] && ytcli search "$q"'`,
+  ].join("\n")
+}
+
+export const fzfAliasesCmd: CommandModule = {
+  command: "fzf-aliases",
+  describe: "Print shell aliases/functions for fzf-powered helpers",
+  handler: () => {
+    console.log(getFzfAliases())
+  },
+}

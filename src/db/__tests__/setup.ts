@@ -3,15 +3,8 @@ import { db } from "../index"
 import { sql } from "drizzle-orm"
 
 beforeAll(() => {
-  db.run(sql`DROP TABLE IF EXISTS history`)
-  db.run(sql`DROP TABLE IF EXISTS playback_state`)
-  db.run(sql`DROP TABLE IF EXISTS queue`)
-  db.run(sql`DROP TABLE IF EXISTS playlist_items`)
-  db.run(sql`DROP TABLE IF EXISTS playlists`)
-  db.run(sql`DROP TABLE IF EXISTS config`)
-
   db.run(sql`
-    CREATE TABLE playlists (
+    CREATE TABLE IF NOT EXISTS playlists (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       created_at TEXT DEFAULT (datetime('now')),
@@ -20,7 +13,7 @@ beforeAll(() => {
   `)
 
   db.run(sql`
-    CREATE TABLE playlist_items (
+    CREATE TABLE IF NOT EXISTS playlist_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       playlist_id INTEGER NOT NULL,
       url TEXT NOT NULL,
@@ -32,7 +25,7 @@ beforeAll(() => {
   `)
 
   db.run(sql`
-    CREATE TABLE queue (
+    CREATE TABLE IF NOT EXISTS queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       url TEXT NOT NULL,
       title TEXT,
@@ -44,7 +37,7 @@ beforeAll(() => {
   `)
 
   db.run(sql`
-    CREATE TABLE playback_state (
+    CREATE TABLE IF NOT EXISTS playback_state (
       id INTEGER PRIMARY KEY DEFAULT 1,
       queue_id INTEGER,
       position REAL DEFAULT 0,
@@ -54,7 +47,7 @@ beforeAll(() => {
   `)
 
   db.run(sql`
-    CREATE TABLE history (
+    CREATE TABLE IF NOT EXISTS history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       url TEXT NOT NULL,
       title TEXT,
@@ -68,7 +61,7 @@ beforeAll(() => {
   `)
 
   db.run(sql`
-    CREATE TABLE config (
+    CREATE TABLE IF NOT EXISTS config (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
       updated_at TEXT DEFAULT (datetime('now'))

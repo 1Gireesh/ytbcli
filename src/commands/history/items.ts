@@ -1,5 +1,24 @@
 import type { CommandModule } from "yargs"
-import { getHistoryItems, searchHistory, filterHistory, sortHistory, getHistoryStats, getRecentItems, getTopItems, getUniqueItems, deduplicateHistory, removeFromHistory, removeByUrl, clearHistory } from "../../db/history"
+import { addToHistory, getHistoryItems, searchHistory, filterHistory, sortHistory, getHistoryStats, getRecentItems, getTopItems, getUniqueItems, deduplicateHistory, removeFromHistory, removeByUrl, clearHistory, type HistoryItem } from "../../db/history"
+import { withClient } from "../playback"
+import { commands as mpv } from "../../mpv"
+import { add as addToQueue, clear as clearQueue, setCurrent } from "../../db/queue"
+import { getRepeatMode } from "../../db/playback"
+import { HISTORY_CACHE_PATH, readJsonCache, writeJsonCache } from "../cache"
+
+function writeHistoryCache(items: HistoryItem[]): void {
+  writeJsonCache(HISTORY_CACHE_PATH, items)
+}
+
+function printHistoryBrowse(items: HistoryItem[]): void {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    console.log(`${i + 1}. ${item.title || item.url}`)
+    console.log(`   ${item.channel || "Unknown"}`)
+    console.log(`   ${item.url}`)
+    console.log()
+  }
+}
 
 export const listCmd: CommandModule = {
   command: "list",
@@ -15,10 +34,43 @@ export const listCmd: CommandModule = {
         description: "Offset for pagination",
         type: "number",
         default: 0,
+      })
+      .option("plain", {
+        description: "Output as: index<TAB>title-or-url<TAB>channel",
+        type: "boolean",
+        default: false,
       }),
   handler: (argv) => {
     const items = getHistoryItems(argv.limit as number, argv.offset as number)
+    writeHistoryCache(items)
+    if (argv.plain) {
+      for (let i = 0; i < items.length; i++) {
+        console.log(`${i + 1}\t${items[i].title || items[i].url}\t${items[i].channel || ""}`)
+      }
+      return
+    }
     console.log(JSON.stringify(items, null, 2))
+  },
+}
+
+export const browseCmd: CommandModule = {
+  command: "browse [count]",
+  describe: "Browse recent history with numbers (for quick play by number)",
+  builder: (yargs) =>
+    yargs.positional("count", {
+      description: "Number of history items to browse",
+      type: "number",
+      default: 20,
+    }),
+  handler: (argv) => {
+    const items = getHistoryItems(argv.count as number, 0)
+    if (items.length === 0) {
+      console.log("History is empty")
+      return
+    }
+    writeHistoryCache(items)
+    printHistoryBrowse(items)
+    console.log("Play any result: ytcli history play <number>")
   },
 }
 
@@ -186,5 +238,77 @@ export const deduplicateCmd: CommandModule = {
   handler: () => {
     const removed = deduplicateHistory()
     console.log(`Removed ${removed} duplicates`)
+  },
+}
+
+export const playCmd: CommandModule = {
+  command: "play <index>",
+  describe: "Play a specific history entry (1-based index from history list)",
+  builder: (yargs) =>
+    yargs
+      .positional("index", {
+        description: "History item number (1-based)",
+        type: "number",
+      })
+      .option("limit", {
+        description: "History window size used for index lookup",
+        type: "number",
+        default: 50,
+      })
+      .option("offset", {
+        description: "History offset used for index lookup",
+        type: "number",
+        default: 0,
+      })
+      .option("video", {
+        description: "Play with video (default: audio only)",
+        type: "boolean",
+        default: false,
+        alias: "v",
+      })
+      .option("cache", {
+        description: "Use last history browse/list cache for index lookup",
+        type: "boolean",
+        default: true,
+      }),
+  handler: async (argv) => {
+    const cached = argv.cache ? readJsonCache<HistoryItem[]>(HISTORY_CACHE_PATH) : null
+    const items = cached && cached.length > 0
+      ? cached
+      : getHistoryItems(argv.limit as number, argv.offset as number)
+    const index = Math.max((argv.index as number) - 1, 0)
+    const target = items[index]
+
+    if (!target) {
+      console.log(`Invalid history index. Choose 1-${items.length}`)
+      return
+    }
+
+    clearQueue()
+    const queueItem = addToQueue(target.url, target.title || undefined, target.channel || undefined, target.duration || undefined)
+    for (let i = 0; i < items.length; i++) {
+      if (i !== index) {
+        const item = items[i]
+        addToQueue(item.url, item.title || undefined, item.channel || undefined, item.duration || undefined)
+      }
+    }
+    setCurrent(queueItem.id)
+
+    await withClient(async (client) => {
+      await mpv.playlistClear(client)
+      await mpv.play(client, target.url)
+      for (let i = 0; i < items.length; i++) {
+        if (i !== index) {
+          await mpv.append(client, items[i].url)
+        }
+      }
+      await mpv.setVideoEnabled(client, !!argv.video)
+      await mpv.setRepeatMode(client, getRepeatMode())
+      await mpv.unpause(client)
+    })
+
+    addToHistory(target.url, target.title || undefined, target.channel || undefined, target.duration || undefined)
+
+    console.log(JSON.stringify(queueItem, null, 2))
   },
 }

@@ -10,6 +10,7 @@ import queueCommand from "./commands/queue"
 import historyCommand from "./commands/history"
 import configCommand from "./commands/config"
 import { exportAllCmd, importAllCmd } from "./commands/data"
+import downloadCommand from "./commands/download"
 
 // Playback commands
 import { statusCmd, currentCmd, nextCmd, prevCmd, pauseCmd, stopCmd } from "./commands/playback"
@@ -28,6 +29,7 @@ yargs(hideBin(process.argv))
   // Data import/export
   .command(exportAllCmd)
   .command(importAllCmd)
+  .command(downloadCommand)
   // Playback control
   .command(statusCmd)
   .command(currentCmd)
