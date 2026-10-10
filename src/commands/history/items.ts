@@ -35,17 +35,34 @@ export const listCmd: CommandModule = {
         type: "number",
         default: 0,
       })
+      .option("min-rating", {
+        description: "Filter by minimum rating (1-10)",
+        type: "number",
+      })
+      .option("sort", {
+        description: "Sort by: date, rating, title, url, channel",
+        type: "string",
+        choices: ["date", "rating", "title", "url", "channel"],
+      })
       .option("plain", {
         description: "Output as: index<TAB>title-or-url<TAB>channel",
         type: "boolean",
         default: false,
       }),
   handler: (argv) => {
-    const items = getHistoryItems(argv.limit as number, argv.offset as number)
+    let items = getHistoryItems(
+      argv.limit as number,
+      argv.offset as number,
+      argv["min-rating"] as number | undefined,
+    )
+    if (argv.sort) {
+      items = sortHistory(argv.sort as "date" | "title" | "url" | "channel" | "rating")
+    }
     writeHistoryCache(items)
     if (argv.plain) {
       for (let i = 0; i < items.length; i++) {
-        console.log(`${i + 1}\t${items[i].title || items[i].url}\t${items[i].channel || ""}`)
+        const ratingStr = items[i].rating ? `\t[${items[i].rating}/10]` : ""
+        console.log(`${i + 1}\t${items[i].title || items[i].url}\t${items[i].channel || ""}${ratingStr}`)
       }
       return
     }
@@ -180,12 +197,12 @@ export const sortCmd: CommandModule = {
   describe: "Sort history by criteria",
   builder: (yargs) =>
     yargs.positional("by", {
-      description: "Sort by: date, title, url, channel",
+      description: "Sort by: date, rating, title, url, channel",
       type: "string",
-      choices: ["date", "title", "url", "channel"],
+      choices: ["date", "rating", "title", "url", "channel"],
     }),
   handler: (argv) => {
-    const items = sortHistory(argv.by as "date" | "title" | "url" | "channel")
+    const items = sortHistory(argv.by as "date" | "rating" | "title" | "url" | "channel")
     console.log(JSON.stringify(items, null, 2))
   },
 }

@@ -50,3 +50,14 @@ export const config = sqliteTable("config", {
   value: text("value").notNull(),
   updatedAt: text("updated_at").default("datetime('now')"),
 })
+
+export const ratings = sqliteTable("ratings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  url: text("url").notNull().unique(),
+  title: text("title"),
+  channel: text("channel"),
+  duration: integer("duration"),
+  rating: integer("rating").notNull(),
+  createdAt: text("created_at").default("datetime('now')"),
+  updatedAt: text("updated_at").default("datetime('now')"),
+})

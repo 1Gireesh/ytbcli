@@ -11,6 +11,7 @@ import historyCommand from "./commands/history"
 import configCommand from "./commands/config"
 import { exportAllCmd, importAllCmd } from "./commands/data"
 import downloadCommand from "./commands/download"
+import rateCommand from "./commands/rate"
 
 // Playback commands
 import { statusCmd, currentCmd, nextCmd, prevCmd, pauseCmd, stopCmd } from "./commands/playback"
@@ -24,6 +25,7 @@ yargs(hideBin(process.argv))
   .command(playlistCommand)
   .command(queueCommand)
   .command(historyCommand)
+  .command(rateCommand)
   // Config
   .command(configCommand)
   // Data import/export

@@ -14,5 +14,17 @@ if (!existsSync(DATA_DIR)) {
 const sqlite = new Database(DB_PATH)
 sqlite.exec("PRAGMA journal_mode = WAL")
 sqlite.exec("PRAGMA foreign_keys = ON")
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT,
+    channel TEXT,
+    duration INTEGER,
+    rating INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  )
+`)
 
 export const db = drizzle(sqlite, { schema })

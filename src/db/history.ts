@@ -51,18 +51,43 @@ export function clearHistory(olderThanDays?: number): number {
   return result.changes
 }
 
-export function getHistoryItems(limit: number = 50, offset: number = 0): HistoryItem[] {
-  return db.select().from(history).orderBy(desc(history.playedAt)).limit(limit).offset(offset).all()
+import { getRatingsMap } from "./ratings"
+
+export type HistoryItemWithRating = HistoryItem & {
+  rating?: number | null
 }
 
-export function searchHistory(query: string): HistoryItem[] {
+export function getHistoryItems(limit: number = 50, offset: number = 0, minRating?: number): HistoryItemWithRating[] {
+  const ratingsMap = getRatingsMap()
+  const items = db.select().from(history).orderBy(desc(history.playedAt)).limit(minRating !== undefined ? 1000 : limit).offset(minRating !== undefined ? 0 : offset).all()
+  const withRatings = items.map(item => ({
+    ...item,
+    rating: ratingsMap.get(item.url) ?? null,
+  }))
+
+  if (minRating !== undefined) {
+    return withRatings
+      .filter(item => item.rating !== null && item.rating >= minRating)
+      .slice(offset, offset + limit)
+  }
+
+  return withRatings
+}
+
+export function searchHistory(query: string): HistoryItemWithRating[] {
+  const ratingsMap = getRatingsMap()
   return db.select().from(history)
     .where(or(like(history.url, `%${query}%`), like(history.title, `%${query}%`)))
     .orderBy(desc(history.playedAt))
     .all()
+    .map(item => ({
+      ...item,
+      rating: ratingsMap.get(item.url) ?? null,
+    }))
 }
 
-export function filterHistory(query: string, field: "title" | "url" | "channel" | "all" = "all"): HistoryItem[] {
+export function filterHistory(query: string, field: "title" | "url" | "channel" | "all" = "all"): HistoryItemWithRating[] {
+  const ratingsMap = getRatingsMap()
   const whereClause = field === "all"
     ? or(like(history.url, `%${query}%`), like(history.title, `%${query}%`), like(history.channel, `%${query}%`))
     : field === "title"
@@ -71,19 +96,36 @@ export function filterHistory(query: string, field: "title" | "url" | "channel" 
         ? like(history.url, `%${query}%`)
         : like(history.channel, `%${query}%`)
 
-  return db.select().from(history).where(whereClause).orderBy(desc(history.playedAt)).all()
+  return db.select().from(history).where(whereClause).orderBy(desc(history.playedAt)).all().map(item => ({
+    ...item,
+    rating: ratingsMap.get(item.url) ?? null,
+  }))
 }
 
-export function sortHistory(by: "date" | "title" | "url" | "channel"): HistoryItem[] {
-  const orderBy = by === "date"
-    ? desc(history.playedAt)
-    : by === "title"
-      ? history.title
-      : by === "url"
-        ? history.url
-        : history.channel
+export function sortHistory(by: "date" | "title" | "url" | "channel" | "rating"): HistoryItemWithRating[] {
+  const ratingsMap = getRatingsMap()
+  const items = db.select().from(history).all().map(item => ({
+    ...item,
+    rating: ratingsMap.get(item.url) ?? null,
+  }))
 
-  return db.select().from(history).orderBy(orderBy).all()
+  if (by === "rating") {
+    return items.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+  }
+
+  if (by === "date") {
+    return items.sort((a, b) => ((b.playedAt || "") > (a.playedAt || "") ? 1 : -1))
+  }
+
+  if (by === "title") {
+    return items.sort((a, b) => (a.title || "").localeCompare(b.title || ""))
+  }
+
+  if (by === "url") {
+    return items.sort((a, b) => a.url.localeCompare(b.url))
+  }
+
+  return items.sort((a, b) => (a.channel || "").localeCompare(b.channel || ""))
 }
 
 export function getHistoryStats(): { total: number; uniqueUrls: number; channels: string[] } {

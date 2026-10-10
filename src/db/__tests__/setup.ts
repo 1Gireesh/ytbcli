@@ -67,4 +67,17 @@ beforeAll(() => {
       updated_at TEXT DEFAULT (datetime('now'))
     )
   `)
+
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS ratings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT NOT NULL UNIQUE,
+      title TEXT,
+      channel TEXT,
+      duration INTEGER,
+      rating INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `)
 })

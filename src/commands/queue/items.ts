@@ -229,7 +229,28 @@ export const listCmd: CommandModule = {
 export const currentCmd: CommandModule = {
   command: "current",
   describe: "Show currently playing item",
-  handler: () => {
+  handler: async () => {
+    try {
+      await withClient(async (client) => {
+        const path = await client.getProperty<string>("path").catch(() => null)
+        if (path) {
+          const items = list()
+          const matched = items.find(
+            (i) => i.url === path || (path.includes(i.url.replace("https://www.youtube.com/watch?v=", "")))
+          )
+          if (matched) {
+            setCurrent(matched.id)
+            console.log(JSON.stringify(matched, null, 2))
+            return
+          } else {
+            setCurrent(null)
+          }
+        } else {
+          setCurrent(null)
+        }
+      })
+    } catch {}
+
     const item = current()
     console.log(item ? JSON.stringify(item, null, 2) : "Nothing playing")
   },

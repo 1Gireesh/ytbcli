@@ -93,16 +93,17 @@ export async function syncQueueToMpv(client: MpvClient, targetUrlOrIndex?: strin
   const matches = playlist && playlist.length === items.length && items.every((item, i) => playlist[i]?.filename === item.url)
 
   if (!matches) {
-    await mpv.playlistClear(client)
-    for (const item of items) {
-      await mpv.append(client, item.url)
+    await mpv.play(client, items[0].url)
+    for (let i = 1; i < items.length; i++) {
+      await mpv.append(client, items[i].url)
     }
   }
 
-  if (targetIndex >= 0 && targetIndex < items.length) {
+  if (targetIndex > 0 && targetIndex < items.length) {
     await mpv.playlistPlayIndex(client, targetIndex)
-    setCurrent(items[targetIndex].id)
   }
+
+  setCurrent(items[targetIndex].id)
 
   if (video !== undefined) {
     await mpv.setVideoEnabled(client, video)
@@ -172,7 +173,6 @@ export const statusCmd: CommandModule = {
   command: "status",
   describe: "Show playback status",
   handler: async () => {
-    let currentItem = current()
     await withClient(async (client) => {
       const [title, paused, volume, position, duration, path] = await Promise.allSettled([
         client.getProperty<string>("media-title"),
@@ -184,13 +184,21 @@ export const statusCmd: CommandModule = {
       ])
 
       const currentPath = path.status === "fulfilled" ? path.value : null
+      let currentItem = null
+
       if (currentPath) {
         const items = list()
-        const matched = items.find(i => i.url === currentPath || (currentPath.includes(i.url.replace("https://www.youtube.com/watch?v=", ""))))
-        if (matched && (!currentItem || currentItem.id !== matched.id)) {
+        const matched = items.find(
+          (i) => i.url === currentPath || (currentPath.includes(i.url.replace("https://www.youtube.com/watch?v=", "")))
+        )
+        if (matched) {
           setCurrent(matched.id)
           currentItem = matched
+        } else {
+          setCurrent(null)
         }
+      } else {
+        setCurrent(null)
       }
 
       console.log(JSON.stringify({
@@ -209,10 +217,37 @@ export const currentCmd: CommandModule = {
   command: "current",
   describe: "Show currently playing video",
   handler: async () => {
-    const currentItem = current()
-    console.log(JSON.stringify({
-      queue: currentItem,
-    }, null, 2))
+    try {
+      await withClient(async (client) => {
+        const [path, title] = await Promise.allSettled([
+          client.getProperty<string>("path"),
+          client.getProperty<string>("media-title"),
+        ])
+        const currentPath = path.status === "fulfilled" ? path.value : null
+        const mediaTitle = title.status === "fulfilled" ? title.value : null
+
+        if (!currentPath) {
+          setCurrent(null)
+          console.log(JSON.stringify({ queue: null, message: "Nothing playing" }, null, 2))
+          return
+        }
+
+        const items = list()
+        const matched = items.find(
+          (i) => i.url === currentPath || (currentPath.includes(i.url.replace("https://www.youtube.com/watch?v=", "")))
+        )
+        if (matched) {
+          setCurrent(matched.id)
+          console.log(JSON.stringify({ queue: matched, title: mediaTitle, url: currentPath }, null, 2))
+        } else {
+          setCurrent(null)
+          console.log(JSON.stringify({ queue: null, title: mediaTitle, url: currentPath }, null, 2))
+        }
+      })
+    } catch {
+      const currentItem = current()
+      console.log(JSON.stringify({ queue: currentItem }, null, 2))
+    }
   },
 }
 
@@ -233,30 +268,45 @@ export const nextCmd: CommandModule = {
       return
     }
 
-    const currentIndex = getCurrentIndex(items)
-    const targetIndex = resolveNextIndex(currentIndex, items.length)
-
-    if (targetIndex === null) {
-      console.log("No next item")
-      return
-    }
-
-    const nextItem = items[targetIndex]
     await withClient(async (client) => {
-      const playlist = await mpv.getPlaylist(client) as Array<{ filename: string }> | undefined
-      if (playlist && playlist.length === items.length && playlist[targetIndex]?.filename === nextItem.url) {
+      const playlist = await mpv.getPlaylist(client) as Array<{ filename: string; current?: boolean }> | undefined
+      const matches = playlist && playlist.length === items.length && items.every((item, i) => playlist[i]?.filename === item.url)
+
+      if (matches) {
         await mpv.playlistNext(client)
       } else {
-        await syncQueueToMpv(client, targetIndex, !!argv.video)
+        const currentPath = await client.getProperty<string>("path").catch(() => null)
+        let curIdx = -1
+        if (currentPath) {
+          curIdx = items.findIndex((i) => i.url === currentPath || currentPath.includes(i.url.replace("https://www.youtube.com/watch?v=", "")))
+        }
+        const targetIdx = resolveNextIndex(curIdx, items.length)
+        if (targetIdx === null) {
+          console.log("No next item")
+          return
+        }
+        await syncQueueToMpv(client, targetIdx, !!argv.video)
       }
+
       await mpv.setVideoEnabled(client, !!argv.video)
       await mpv.setRepeatMode(client, getRepeatMode())
       await mpv.unpause(client)
-    })
 
-    setCurrent(nextItem.id)
-    addToHistory(nextItem.url, nextItem.title || undefined, nextItem.channel || undefined, nextItem.duration || undefined)
-    console.log(JSON.stringify(nextItem, null, 2))
+      const newPath = await client.getProperty<string>("path").catch(() => null)
+      const newTitle = await client.getProperty<string>("media-title").catch(() => null)
+      const matched = items.find((i) => newPath && (i.url === newPath || newPath.includes(i.url.replace("https://www.youtube.com/watch?v=", ""))))
+
+      if (matched) {
+        setCurrent(matched.id)
+        addToHistory(matched.url, matched.title || undefined, matched.channel || undefined, matched.duration || undefined)
+        console.log(JSON.stringify(matched, null, 2))
+      } else if (newPath) {
+        setCurrent(null)
+        console.log(JSON.stringify({ title: newTitle, url: newPath }, null, 2))
+      } else {
+        console.log("No next item")
+      }
+    })
   },
 }
 
@@ -277,30 +327,45 @@ export const prevCmd: CommandModule = {
       return
     }
 
-    const currentIndex = getCurrentIndex(items)
-    const targetIndex = resolvePrevIndex(currentIndex, items.length)
-
-    if (targetIndex === null) {
-      console.log("No previous item")
-      return
-    }
-
-    const prevItem = items[targetIndex]
     await withClient(async (client) => {
-      const playlist = await mpv.getPlaylist(client) as Array<{ filename: string }> | undefined
-      if (playlist && playlist.length === items.length && playlist[targetIndex]?.filename === prevItem.url) {
+      const playlist = await mpv.getPlaylist(client) as Array<{ filename: string; current?: boolean }> | undefined
+      const matches = playlist && playlist.length === items.length && items.every((item, i) => playlist[i]?.filename === item.url)
+
+      if (matches) {
         await mpv.playlistPrev(client)
       } else {
-        await syncQueueToMpv(client, targetIndex, !!argv.video)
+        const currentPath = await client.getProperty<string>("path").catch(() => null)
+        let curIdx = -1
+        if (currentPath) {
+          curIdx = items.findIndex((i) => i.url === currentPath || currentPath.includes(i.url.replace("https://www.youtube.com/watch?v=", "")))
+        }
+        const targetIdx = resolvePrevIndex(curIdx, items.length)
+        if (targetIdx === null) {
+          console.log("No previous item")
+          return
+        }
+        await syncQueueToMpv(client, targetIdx, !!argv.video)
       }
+
       await mpv.setVideoEnabled(client, !!argv.video)
       await mpv.setRepeatMode(client, getRepeatMode())
       await mpv.unpause(client)
-    })
 
-    setCurrent(prevItem.id)
-    addToHistory(prevItem.url, prevItem.title || undefined, prevItem.channel || undefined, prevItem.duration || undefined)
-    console.log(JSON.stringify(prevItem, null, 2))
+      const newPath = await client.getProperty<string>("path").catch(() => null)
+      const newTitle = await client.getProperty<string>("media-title").catch(() => null)
+      const matched = items.find((i) => newPath && (i.url === newPath || newPath.includes(i.url.replace("https://www.youtube.com/watch?v=", ""))))
+
+      if (matched) {
+        setCurrent(matched.id)
+        addToHistory(matched.url, matched.title || undefined, matched.channel || undefined, matched.duration || undefined)
+        console.log(JSON.stringify(matched, null, 2))
+      } else if (newPath) {
+        setCurrent(null)
+        console.log(JSON.stringify({ title: newTitle, url: newPath }, null, 2))
+      } else {
+        console.log("No previous item")
+      }
+    })
   },
 }
 
